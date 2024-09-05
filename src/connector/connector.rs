@@ -16,7 +16,7 @@ struct MeowithConnector {
 impl MeowithConnector {
     fn new(token: &str, bucket_id: Uuid, app_id: Uuid, node_addr: String) -> Self {
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, HeaderValue::from_str(token).unwrap());
+        headers.insert(AUTHORIZATION, HeaderValue::from_str(concat!("Bearer ", token)).unwrap());
 
         Self {
             client: ClientBuilder::new()

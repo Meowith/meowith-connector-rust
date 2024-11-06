@@ -6,7 +6,7 @@ use tokio::io::{AsyncWrite, AsyncWriteExt};
 use uuid::Uuid;
 
 #[derive(Clone)]
-struct MeowithConnector {
+pub struct MeowithConnector {
     client: Client,
     bucket_id: Uuid,
     app_id: Uuid,
@@ -14,7 +14,7 @@ struct MeowithConnector {
 }
 
 impl MeowithConnector {
-    fn new(token: &str, bucket_id: Uuid, app_id: Uuid, node_addr: String) -> Self {
+    pub fn new(token: &str, bucket_id: Uuid, app_id: Uuid, node_addr: String) -> Self {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_str(format!("Bearer {}", token).as_str()).unwrap());
 
@@ -29,7 +29,7 @@ impl MeowithConnector {
         }
     }
 
-    async fn upload_oneshot(
+    pub async fn upload_oneshot(
         &self,
         stream: Body,
         path: &str,
@@ -54,7 +54,7 @@ impl MeowithConnector {
         Ok(())
     }
 
-    async fn delete_file(&self, path: &str) -> ConnectorResponse<()> {
+    pub async fn delete_file(&self, path: &str) -> ConnectorResponse<()> {
         let response = self
             .client
             .delete(format!(
@@ -72,7 +72,7 @@ impl MeowithConnector {
         Ok(())
     }
 
-    async fn rename_file(&self, from: &str, to: &str) -> ConnectorResponse<()> {
+    pub async fn rename_file(&self, from: &str, to: &str) -> ConnectorResponse<()> {
         let req = RenameEntityRequest { to: to.to_string() };
 
         let response = self
@@ -93,7 +93,7 @@ impl MeowithConnector {
         Ok(())
     }
 
-    async fn download_file(
+    pub async fn download_file(
         &self,
         stream: &mut (impl AsyncWrite + Unpin + Send),
         path: &str,

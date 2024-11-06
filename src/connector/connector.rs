@@ -1,8 +1,8 @@
 use crate::dto::request::RenameEntityRequest;
 use crate::error::{ConnectorError, ConnectorResponse, NodeClientError};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_LENGTH};
-use reqwest::{Client, ClientBuilder};
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use reqwest::{Body, Client, ClientBuilder};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -16,7 +16,7 @@ struct MeowithConnector {
 impl MeowithConnector {
     fn new(token: &str, bucket_id: Uuid, app_id: Uuid, node_addr: String) -> Self {
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, HeaderValue::from_str(concat!("Bearer ", token)).unwrap());
+        headers.insert(AUTHORIZATION, HeaderValue::from_str(format!("Bearer {}", token).as_str()).unwrap());
 
         Self {
             client: ClientBuilder::new()
@@ -31,7 +31,7 @@ impl MeowithConnector {
 
     async fn upload_oneshot(
         &self,
-        stream: &mut impl AsyncRead,
+        stream: Body,
         path: &str,
         size: u64,
     ) -> ConnectorResponse<()> {
@@ -95,7 +95,7 @@ impl MeowithConnector {
 
     async fn download_file(
         &self,
-        stream: &mut impl AsyncWrite,
+        stream: &mut (impl AsyncWrite + Unpin + Send),
         path: &str,
     ) -> ConnectorResponse<()> {
         let mut response = self

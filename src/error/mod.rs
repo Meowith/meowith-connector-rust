@@ -1,7 +1,7 @@
 use reqwest::{Error, Response};
 use serde::Deserialize;
 
-pub type ConnectorResponse<T> = Result<T, ConnectorError>;
+pub(crate) type ConnectorResponse<T> = Result<T, ConnectorError>;
 
 #[derive(Deserialize)]
 pub struct ErrorResponse {

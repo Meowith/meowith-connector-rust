@@ -1,8 +1,12 @@
+use crate::connector::headers::{extract_filename, DESERIALIZE_ERROR};
 use crate::dto::request::RenameEntityRequest;
+use crate::dto::response::FileResponse;
+use crate::error::ConnectorError::Remote;
 use crate::error::{ConnectorError, ConnectorResponse, NodeClientError};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_LENGTH};
+use reqwest::header::{
+    HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE,
+};
 use reqwest::{Body, Client, ClientBuilder};
-use tokio::io::{AsyncWrite, AsyncWriteExt};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -16,7 +20,10 @@ pub struct MeowithConnector {
 impl MeowithConnector {
     pub fn new(token: &str, bucket_id: Uuid, app_id: Uuid, node_addr: String) -> Self {
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, HeaderValue::from_str(format!("Bearer {}", token).as_str()).unwrap());
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(format!("Bearer {}", token).as_str()).unwrap(),
+        );
 
         Self {
             client: ClientBuilder::new()
@@ -93,12 +100,8 @@ impl MeowithConnector {
         Ok(())
     }
 
-    pub async fn download_file(
-        &self,
-        stream: &mut (impl AsyncWrite + Unpin + Send),
-        path: &str,
-    ) -> ConnectorResponse<()> {
-        let mut response = self
+    pub async fn download_file(&self, path: &str) -> ConnectorResponse<FileResponse> {
+        let response = self
             .client
             .get(format!(
                 "{}/api/file/download/{}/{}/{}",
@@ -108,16 +111,33 @@ impl MeowithConnector {
             .await?;
         let status = response.status();
         if !status.is_success() {
-            return Err(ConnectorError::Remote(
-                NodeClientError::from(response).await,
-            ));
+            return Err(Remote(NodeClientError::from(response).await));
         }
 
-        while let Some(chunk) = response.chunk().await? {
-            stream.write_all(&chunk).await.unwrap()
-        }
-
-        Ok(())
+        Ok(FileResponse {
+            length: response
+                .headers()
+                .get(CONTENT_LENGTH)
+                .ok_or(DESERIALIZE_ERROR)?
+                .to_str()?
+                .to_string()
+                .parse::<u64>()?,
+            name: extract_filename(
+                response
+                    .headers()
+                    .get(CONTENT_DISPOSITION)
+                    .ok_or(DESERIALIZE_ERROR)?
+                    .to_str()?,
+            )
+            .ok_or(DESERIALIZE_ERROR)?,
+            mime: response
+                .headers()
+                .get(CONTENT_TYPE)
+                .ok_or(DESERIALIZE_ERROR)?
+                .to_str()?
+                .to_string(),
+            response,
+        })
     }
 
     // TODO, durable upload, dir ops, list ops

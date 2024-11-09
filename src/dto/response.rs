@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use reqwest::Response;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -81,4 +82,12 @@ pub struct AppTokenDTO {
 #[repr(C)]
 pub struct TokenListResponse {
     pub tokens: Vec<AppTokenDTO>,
+}
+
+#[derive(Debug)]
+pub struct FileResponse {
+    pub length: u64,
+    pub name: String,
+    pub mime: String,
+    pub response: Response,
 }

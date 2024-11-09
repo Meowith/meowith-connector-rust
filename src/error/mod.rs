@@ -1,7 +1,9 @@
+use reqwest::header::ToStrError;
 use reqwest::{Error, Response};
 use serde::Deserialize;
+use std::num::ParseIntError;
 
-pub(crate) type ConnectorResponse<T> = Result<T, ConnectorError>;
+pub type ConnectorResponse<T> = Result<T, ConnectorError>;
 
 #[derive(Deserialize)]
 pub struct ErrorResponse {
@@ -31,7 +33,8 @@ impl NodeClientError {
 }
 
 #[derive(Debug)]
-pub(crate) enum ConnectorError {
+#[allow(unused)]
+pub enum ConnectorError {
     Remote(NodeClientError),
     Local(Error),
 }
@@ -39,5 +42,17 @@ pub(crate) enum ConnectorError {
 impl From<Error> for ConnectorError {
     fn from(value: Error) -> Self {
         ConnectorError::Local(value)
+    }
+}
+
+impl From<ParseIntError> for ConnectorError {
+    fn from(_: ParseIntError) -> Self {
+        ConnectorError::Remote(NodeClientError::BadRequest)
+    }
+}
+
+impl From<ToStrError> for ConnectorError {
+    fn from(_: ToStrError) -> Self {
+        ConnectorError::Remote(NodeClientError::BadRequest)
     }
 }

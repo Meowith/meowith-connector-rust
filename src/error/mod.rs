@@ -1,5 +1,7 @@
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use reqwest::header::ToStrError;
-use reqwest::{Error, Response};
+use reqwest::{Response};
 use serde::Deserialize;
 use std::num::ParseIntError;
 
@@ -22,6 +24,15 @@ pub enum NodeClientError {
     NotEmpty,
     RangeUnsatisfiable,
 }
+impl Error for NodeClientError {
+}
+
+impl Display for NodeClientError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("{:?}", self).as_str()).expect("Something went wrong");
+        Ok(())
+    }
+}
 
 impl NodeClientError {
     pub async fn from(value: Response) -> Self {
@@ -36,12 +47,18 @@ impl NodeClientError {
 #[allow(unused)]
 pub enum ConnectorError {
     Remote(NodeClientError),
-    Local(Error),
+    Local(Box<dyn Error>),
 }
 
-impl From<Error> for ConnectorError {
-    fn from(value: Error) -> Self {
+impl From<Box<dyn Error>> for ConnectorError {
+    fn from(value: Box<dyn Error>) -> Self {
         ConnectorError::Local(value)
+    }
+}
+
+impl From<reqwest::Error> for ConnectorError {
+    fn from(value: reqwest::Error) -> Self {
+        ConnectorError::Local(Box::new(value))
     }
 }
 

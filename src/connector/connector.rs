@@ -1,7 +1,7 @@
-use crate::connector::headers::{extract_filename, DESERIALIZE_ERROR};
+use crate::connector::headers::{extract_filename};
 use crate::dto::request::RenameEntityRequest;
 use crate::dto::response::FileResponse;
-use crate::error::ConnectorError::Remote;
+use crate::error::ConnectorError::{Local, Remote};
 use crate::error::{ConnectorError, ConnectorResponse, NodeClientError};
 use reqwest::header::{
     HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE,
@@ -72,7 +72,7 @@ impl MeowithConnector {
             .await?;
         let status = response.status();
         if !status.is_success() {
-            return Err(ConnectorError::Remote(
+            return Err(Remote(
                 NodeClientError::from(response).await,
             ));
         }
@@ -118,7 +118,7 @@ impl MeowithConnector {
             length: response
                 .headers()
                 .get(CONTENT_LENGTH)
-                .ok_or(DESERIALIZE_ERROR)?
+                .ok_or(Local(Box::new(NodeClientError::BadRequest)))?
                 .to_str()?
                 .to_string()
                 .parse::<u64>()?,
@@ -126,14 +126,14 @@ impl MeowithConnector {
                 response
                     .headers()
                     .get(CONTENT_DISPOSITION)
-                    .ok_or(DESERIALIZE_ERROR)?
+                    .ok_or(Local(Box::new(NodeClientError::BadRequest)))?
                     .to_str()?,
             )
-            .ok_or(DESERIALIZE_ERROR)?,
+            .ok_or(Local(Box::new(NodeClientError::BadRequest)))?,
             mime: response
                 .headers()
                 .get(CONTENT_TYPE)
-                .ok_or(DESERIALIZE_ERROR)?
+                .ok_or(Local(Box::new(NodeClientError::BadRequest)))?
                 .to_str()?
                 .to_string(),
             response,

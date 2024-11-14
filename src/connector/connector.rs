@@ -17,6 +17,8 @@ pub struct MeowithConnector {
     node_addr: String,
 }
 
+const CONTENT_LENGTH_HEADER: &str = "X-File-Content-Length";
+
 impl MeowithConnector {
     pub fn new(token: &str, bucket_id: Uuid, app_id: Uuid, node_addr: String) -> Self {
         let mut headers = HeaderMap::new();
@@ -117,7 +119,7 @@ impl MeowithConnector {
         Ok(FileResponse {
             length: response
                 .headers()
-                .get(CONTENT_LENGTH)
+                .get(CONTENT_LENGTH_HEADER)
                 .ok_or(Local(Box::new(NodeClientError::BadRequest)))?
                 .to_str()?
                 .to_string()

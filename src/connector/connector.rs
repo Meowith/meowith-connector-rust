@@ -1,6 +1,7 @@
+use std::str::FromStr;
 use crate::connector::headers::{extract_filename};
-use crate::dto::request::RenameEntityRequest;
-use crate::dto::response::FileResponse;
+use crate::dto::request::{RenameEntityRequest, UploadSessionRequest, UploadSessionResumeRequest};
+use crate::dto::response::{BucketDto, Entity, EntityList, FileResponse, UploadSessionResumeResponse, UploadSessionStartResponse};
 use crate::error::ConnectorError::{Local, Remote};
 use crate::error::{ConnectorError, ConnectorResponse, NodeClientError};
 use reqwest::header::{
@@ -8,6 +9,7 @@ use reqwest::header::{
 };
 use reqwest::{Body, Client, ClientBuilder};
 use uuid::Uuid;
+use crate::dto::range::{construct_pagination_query, Range};
 
 #[derive(Clone)]
 pub struct MeowithConnector {
@@ -95,7 +97,7 @@ impl MeowithConnector {
             .await?;
         let status = response.status();
         if !status.is_success() {
-            return Err(ConnectorError::Remote(
+            return Err(Remote(
                 NodeClientError::from(response).await,
             ));
         }
@@ -142,5 +144,224 @@ impl MeowithConnector {
         })
     }
 
-    // TODO, durable upload, dir ops, list ops
+    pub async fn create_directory(&self, path: String) -> ConnectorResponse<()> {
+        let response = self
+            .client
+            .post(format!(
+                "{}/api/directory/create/{}/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id, path
+            ))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn rename_directory(&self, from: &str, to: &str) -> ConnectorResponse<()> {
+        let req = RenameEntityRequest { to: to.to_string() };
+
+        let response = self
+            .client
+            .post(format!(
+                "{}/api/directory/rename/{}/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id, from
+            ))
+            .json(&req)
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn delete_directory(&self, path: &str) -> ConnectorResponse<()> {
+        let response = self
+            .client
+            .delete(format!(
+                "{}/api/directory/delete/{}/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id, path
+            ))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn list_bucket_files(&self, range: Option<Range>) -> ConnectorResponse<EntityList> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/bucket/list/files/{}/{}{}",
+                self.node_addr, self.app_id, self.bucket_id, construct_pagination_query(range)
+            ))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(response.json::<EntityList>().await.map_err(|e| ConnectorError::from(e))?)
+    }
+
+    pub async fn list_bucket_directories(&self, range: Option<Range>) -> ConnectorResponse<EntityList> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/bucket/list/directories/{}/{}{}",
+                self.node_addr, self.app_id, self.bucket_id, construct_pagination_query(range)
+            ))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(response.json::<EntityList>().await.map_err(|e| ConnectorError::from(e))?)
+    }
+
+    pub async fn list_directory(&self, path: String, range: Option<Range>) -> ConnectorResponse<EntityList> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/directory/list/{}/{}/{}{}",
+                self.node_addr, self.app_id, self.bucket_id, path, construct_pagination_query(range)
+            ))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(response.json::<EntityList>().await.map_err(|e| ConnectorError::from(e))?)
+    }
+
+    pub async fn stat_resource(&self, path: String) -> ConnectorResponse<Entity> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/bucket/stat/{}/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id, path
+            ))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(response.json::<Entity>().await.map_err(|e| ConnectorError::from(e))?)
+    }
+
+    pub async fn fetch_bucket_info(&self) -> ConnectorResponse<BucketDto> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/bucket/info/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id
+            ))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(response.json::<BucketDto>().await.map_err(|e| ConnectorError::from(e))?)
+    }
+
+    pub async fn start_upload_session(&self, path: &str, size: u64) -> ConnectorResponse<UploadSessionStartResponse> {
+        let req = UploadSessionRequest {
+            size
+        };
+        let response = self
+            .client
+            .delete(format!(
+                "{}/api/file/upload/oneshot/{}/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id, path
+            ))
+            .json(&req)
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(response.json::<UploadSessionStartResponse>().await.map_err(|e| ConnectorError::from(e))?)
+    }
+
+    pub async fn resume_upload_session(&self, session: UploadSessionStartResponse) -> ConnectorResponse<UploadSessionResumeResponse> {
+        let req = UploadSessionResumeRequest {
+            session_id: Uuid::from_str(session.code.as_str())?
+        };
+        let response = self
+            .client
+            .delete(format!(
+                "{}/api/file/upload/resume/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id
+            ))
+            .json(&req)
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(response.json::<UploadSessionResumeResponse>().await.map_err(|e| ConnectorError::from(e))?)
+    }
+    pub async fn put_file(&self, session: UploadSessionStartResponse, stream: Body) -> ConnectorResponse<()> {
+        let req = UploadSessionResumeRequest {
+            session_id: Uuid::from_str(session.code.as_str())?
+        };
+        let response = self
+            .client
+            .delete(format!(
+                "{}/api/file/upload/put/{}/{}/{}",
+                self.node_addr, self.app_id, self.bucket_id, session.code
+            ))
+            .json(&req)
+            .body(stream)
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Remote(
+                NodeClientError::from(response).await,
+            ));
+        }
+
+        Ok(())
+    }
 }

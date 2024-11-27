@@ -62,6 +62,12 @@ impl From<reqwest::Error> for ConnectorError {
     }
 }
 
+impl From<uuid::Error> for ConnectorError {
+    fn from(value: uuid::Error) -> Self {
+        ConnectorError::Local(Box::new(value))
+    }
+}
+
 impl From<ParseIntError> for ConnectorError {
     fn from(_: ParseIntError) -> Self {
         ConnectorError::Remote(NodeClientError::BadRequest)

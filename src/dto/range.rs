@@ -16,6 +16,6 @@ pub fn construct_pagination_query(range: Option<Range>) -> String {
 }
 
 pub struct Range {
-    start: Option<i32>,
-    end: Option<i32>,
+    pub start: Option<i32>,
+    pub end: Option<i32>,
 }

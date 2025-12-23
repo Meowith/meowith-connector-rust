@@ -1,5 +1,5 @@
 use crate::connector::headers::extract_filename;
-use crate::dto::range::{construct_pagination_query, Range};
+use crate::dto::range::{construct_pagination_query, DownloadRange, Range};
 use crate::dto::request::{
     DeleteDirectoryRequest, RenameEntityRequest, UploadSessionRequest, UploadSessionResumeRequest,
 };
@@ -10,7 +10,7 @@ use crate::dto::response::{
 use crate::error::ConnectorError::{Local, Remote};
 use crate::error::{ConnectorError, ConnectorResponse, NodeClientError};
 use reqwest::header::{
-    HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE,
+    HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE, RANGE,
 };
 use reqwest::{Body, Client, ClientBuilder};
 use std::str::FromStr;
@@ -114,18 +114,22 @@ impl MeowithConnector {
         Ok(())
     }
 
-    pub async fn download_file(&self, path: &str) -> ConnectorResponse<FileResponse> {
-        let response = self
-            .client
-            .get(format!(
-                "{}/api/file/download/{}/{}/{}",
-                self.node_addr,
-                self.app_id,
-                self.bucket_id,
-                urlencoding::encode(path)
-            ))
-            .send()
-            .await?;
+    pub async fn download_file_range(
+        &self,
+        path: &str,
+        range: DownloadRange,
+    ) -> ConnectorResponse<FileResponse> {
+        let mut response = self.client.get(format!(
+            "{}/api/file/download/{}/{}/{}",
+            self.node_addr,
+            self.app_id,
+            self.bucket_id,
+            urlencoding::encode(path)
+        ));
+        if !range.is_full() {
+            response = response.header(RANGE, range.header_value());
+        }
+        let response = response.send().await?;
         let status = response.status();
         if !status.is_success() {
             return Err(Remote(NodeClientError::from(response).await));
@@ -155,6 +159,10 @@ impl MeowithConnector {
                 .to_string(),
             response,
         })
+    }
+
+    pub async fn download_file(&self, path: &str) -> ConnectorResponse<FileResponse> {
+        self.download_file_range(path, DownloadRange::full()).await
     }
 
     pub async fn create_directory(&self, path: &str) -> ConnectorResponse<()> {

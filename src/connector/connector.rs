@@ -98,7 +98,7 @@ impl MeowithConnector {
         let response = self
             .client
             .post(format!(
-                "{}/api/file/upload/rename/{}/{}/{}",
+                "{}/api/file/rename/{}/{}/{}",
                 self.node_addr,
                 self.app_id,
                 self.bucket_id,

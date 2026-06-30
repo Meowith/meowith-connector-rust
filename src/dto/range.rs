@@ -20,6 +20,7 @@ pub struct Range {
     pub end: Option<i32>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Bot start and end are inclusive.
 pub struct DownloadRange {
     pub start: Option<u64>,
